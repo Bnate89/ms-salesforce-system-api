@@ -1,0 +1,33 @@
+http:
+  listener:
+    host: "0.0.0.0"
+    port: "8081"
+    basePath: "/api"
+
+salesforce:
+  config:
+    username: "mulebante12927@agentforce.com"
+    password: "Fasims12$"
+    securityToken: "Csobtpt709ubaDuXeT3YW9zMm"
+  
+  objects:
+    branchAppointment: "BranchAppointment_c"
+    customerInteraction: "CustomerInteraction_c"
+    customerHousehold: "CustomerHousehold_c"
+    loanApplication: "LoanApplication_c"
+    accountOpeningRequest: "AccountOpeningRequest_c"
+    cardRequest: "CardRequest_c"
+    investmentProgramEnrollment: "InvestmentProgramEnrollment_c"
+    complianceCheck: "ComplianceCheck_c"
+    transaction: "Transaction_c"
+    customerDocument: "CustomerDocument_c"
+
+api:
+  security:
+    clientId: "435324t23gf23523g4"
+    clientSecret: "ewrtwetwert3456346g5ft54"
+
+logging:
+  level: "INFO"
+  correlationId:
+    enabled: "true"

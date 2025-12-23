@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>78c3b5c8-9e25-47eb-ad18-be0e4d3cb6b9</groupId>
+  <artifactId>mc-salesforce-system-api</artifactId>
+  <version>1.0.1</version>
+  <name>mc-salesforce-system-api</name>
+  <properties>
+    <classifier>raml</classifier>
+    <main>mc-salesforce-system-api.raml</main>
+    <status>published</status>
+    <originalFormatVersion>1.0</originalFormatVersion>
+    <apiVersion>v1</apiVersion>
+    <projectId>71cebc6e-9300-49b9-94b2-907ddc37fa65</projectId>
+    <branchId>master</branchId>
+    <commitId>dcf7705960d5ae0638affadafeac1546cb4bcdee</commitId>
+    <keywords/>
+    <type>rest-api</type>
+    <mainFile>mc-salesforce-system-api.raml</mainFile>
+  </properties>
+  <repositories>
+    <repository>
+      <id>anypoint-exchange</id>
+      <url>https://maven.anypoint.mulesoft.com/api/v3/maven</url>
+    </repository>
+  </repositories>
+</project>

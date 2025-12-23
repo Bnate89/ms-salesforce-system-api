@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" 
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd 
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd">
+
+	<!-- Global Properties -->
+	<global-property name="mule.env" value="dev" doc:name="Global Property" />
+	
+	<!-- Configuration Properties -->
+	<configuration-properties file="config-${mule.env}.yaml" doc:name="Configuration properties" />
+	<configuration doc:name="Configuration" doc:id="0f73fed9-b82d-482a-9320-b73e9543b3b5" defaultErrorHandler-ref="global-error-handler" />
+ <apikit:config name="mc-salesforce-system-api-config" api="resource::78c3b5c8-9e25-47eb-ad18-be0e4d3cb6b9:mc-salesforce-system-api:1.0.1:raml:zip:mc-salesforce-system-api.raml" outboundHeadersMapName="outboundHeaders" httpStatusVarName="httpStatus" />
+  
+  
+	
+	<!-- HTTP Listener Configuration -->
+	<http:listener-config name="HTTP_Listener_config" doc:name="HTTP Listener config">
+		<http:listener-connection host="${http.listener.host}" port="${http.listener.port}" />
+	</http:listener-config>
+	
+	
+	
+	<salesforce:sfdc-config name="Salesforce_Config" doc:name="Salesforce Config" doc:id="049024f9-07d1-4d7a-9095-587f83f9a263" >
+		<salesforce:basic-connection username="${salesforce.config.username}" 
+			password="${salesforce.config.password}"
+			url="https://login.salesforce.com/services/Soap/u/60.0" securityToken="${salesforce.config.securityToken}">
+			<reconnection>
+				<reconnect frequency="5000" count="3" />
+			</reconnection>
+			</salesforce:basic-connection>
+	</salesforce:sfdc-config>
+
+</mule>

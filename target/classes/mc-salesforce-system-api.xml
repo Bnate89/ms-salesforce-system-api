@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/mule-apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd http://www.mulesoft.org/schema/mule/mule-apikit http://www.mulesoft.org/schema/mule/mule-apikit/current/mule-apikit.xsd http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd ">
+   
+    
+    <flow name="mc-salesforce-system-api-main">
+        <http:listener config-ref="HTTP_Listener_config" path="/api/*">
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:response>
+            <http:error-response statusCode="#[vars.httpStatus default 500]">
+                <http:body>#[payload]</http:body>
+                <http:headers>#[vars.outboundHeaders default {}]</http:headers>
+            </http:error-response>
+        </http:listener>
+        <set-variable value="#[correlationId]" doc:name="Set correlationId" doc:id="ea1ea2e0-dd9c-4343-8a03-a9e6aa5cc291" variableName="correlationId" />
+		<logger level="INFO" doc:name="Log Request" doc:id="283b3c3b-0640-45a8-a26b-752a3967b73b" message='#["Request received - Method: $(attributes.method), Path: $(attributes.requestPath), CorrelationId: $(vars.correlationId)"]' />
+		<flow-ref doc:name="validate-security-subflow" doc:id="64cd82f8-d7b3-4c27-93df-272ebdee9820" name="validate-security-subflow"/>
+		<apikit:router config-ref="mc-salesforce-system-api-config" />
+		<error-handler ref="global-error-handler" />
+    </flow>
+    
+    <!-- Security Validation Subflow -->
+	<sub-flow name="validate-security-subflow" doc:name="validate-security-subflow">
+		<logger level="DEBUG" doc:name="Log Security Check" message="Validating client credentials" />
+		<ee:transform doc:name="Extract Headers">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="clientId"><![CDATA[%dw 2.0
+output application/java
+---
+attributes.headers."x-client-id" default ""]]></ee:set-variable>
+				<ee:set-variable variableName="clientSecret"><![CDATA[%dw 2.0
+output application/java
+---
+attributes.headers."x-client-secret" default ""]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Validate Credentials">
+			<when expression='#[vars.clientId != null  and vars.clientSecret != null]'>
+				<logger level="DEBUG" doc:name="Log Success" message="Security validation successful" />
+			</when>
+			<otherwise>
+				<logger level="WARN" doc:name="Log Failure" message="Security validation failed - Invalid credentials" />
+				<ee:transform doc:name="Unauthorized Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "unauthorized",
+	message: "Invalid or missing credentials",
+	timestamp: now(),
+	correlationId: vars.correlationId
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[401]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<raise-error type="APP:UNAUTHORIZED" description="Invalid client credentials" doc:name="Raise Unauthorized Error" />
+			</otherwise>
+		</choice>
+	</sub-flow>
+	
+    <flow name="get:\account-opening-requests:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\account-opening-requests:banking-system-api-config" doc:id="c74ffd92-22e5-4f05-ad5d-74e44e447a9c" name="get:\account-opening-requests:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\branch-appointments:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\branch-appointments:banking-system-api-config" doc:id="7dc64031-9abe-4cc5-b0cf-b6bcec03ebd1" name="get:\branch-appointments:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\card-requests:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\card-requests:banking-system-api-config" doc:id="23e5242a-16d0-4e2e-9075-9f3b821f12e3" name="get:\card-requests:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\compliance-checks:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\compliance-checks:banking-system-api-config" doc:id="783a32e5-41b6-4976-94e0-62088f0442ce" name="get:\compliance-checks:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\customer-documents:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\customer-documents:banking-system-api-config" doc:id="9e3de060-d009-4bf3-a96e-4b9cabaaa5ed" name="get:\customer-documents:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\customer-households:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\customer-households:banking-system-api-config" doc:id="ef3bc150-44cb-4b2f-8012-aa84b85601c8" name="get:\customer-households:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\customer-interactions:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\customer-interactions:banking-system-api-config" doc:id="b05a129c-1021-4695-bbd5-b868846daa44" name="get:\customer-interactions:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\investment-program-enrollments:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\investment-program-enrollments:banking-system-api-config" doc:id="2b551c65-6a07-4bf2-af81-8322df77f06c" name="get:\investment-program-enrollments:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\loan-applications:mc-salesforce-system-api-config">
+		<flow-ref doc:name="get:\loan-applications:banking-system-api-config" doc:id="77a18dc0-78a8-4443-ac78-6ee5ceaeaebe" name="get:\loan-applications:banking-system-api-config"/>
+    </flow>
+    <flow name="get:\transactions:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\transactions:application\json:banking-system-api-config" doc:id="e5135cd2-ce4e-4462-bbb9-92202edbbeb9" name="post:\transactions:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\account-opening-requests:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\account-opening-requests:application\json:banking-system-api-config" doc:id="c7a03c82-258f-4f64-97bd-1fab5fc6f365" name="post:\account-opening-requests:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\branch-appointments:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\branch-appointments:application\json:banking-system-api-config" doc:id="e9a95217-ee4e-4b35-a05d-b7eabf1eb12c" name="post:\branch-appointments:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\card-requests:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\card-requests:application\json:banking-system-api-config" doc:id="5be40073-a1da-455e-921d-ed259ba1ccf1" name="post:\card-requests:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\compliance-checks:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\compliance-checks:application\json:banking-system-api-config" doc:id="a8ef210c-e928-4375-8436-754e59e5137e" name="post:\compliance-checks:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\customer-documents:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\customer-documents:application\json:banking-system-api-config" doc:id="1b53f7bc-62aa-4edb-9408-169a16857c45" name="post:\customer-documents:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\customer-households:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\customer-documents:application\json:banking-system-api-config" doc:id="235e00a5-a57a-4413-b175-12bf06678e7f" name="post:\customer-documents:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\customer-interactions:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\customer-interactions:application\json:banking-system-api-config" doc:id="8912dd98-f4e0-44d4-8443-2859f3bef8ae" name="post:\customer-interactions:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\investment-program-enrollments:application\json:mc-salesforce-system-api-config" doc:id="fffb0311-4bad-405c-b4a2-4c640f81103c">
+		<flow-ref doc:name="post:\investment-program-enrollments:application\json:mc-salesforce-system-api-config" doc:id="2d474fdc-92bd-4f72-b4f8-e6542457be29" name="post:\investment-program-enrollments:application\json:mc-salesforce-system-api-config"/>
+    </flow>
+    <flow name="post:\loan-applications:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\loan-applications:application\json:banking-system-api-config" doc:id="29916d88-d029-40cd-93dd-5c8e149b5973" name="post:\loan-applications:application\json:banking-system-api-config"/>
+    </flow>
+    <flow name="post:\transactions:application\json:mc-salesforce-system-api-config">
+		<flow-ref doc:name="post:\transactions:application\json:banking-system-api-config" doc:id="50a5990b-4030-4b41-afb2-54b261019ca9" name="post:\transactions:application\json:banking-system-api-config"/>
+    </flow>
+</mule>

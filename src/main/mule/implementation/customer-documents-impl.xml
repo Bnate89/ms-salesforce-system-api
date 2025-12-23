@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+		http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<!-- GET /customer-documents -->
+	<flow name="get:\customer-documents:banking-system-api-config">
+		<logger level="INFO" doc:name="Log Request" message='#["GET /customer-documents - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Build SOQL Query">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="soqlQuery"><![CDATA[%dw 2.0
+output application/java
+var objectName = p('salesforce.objects.customerDocument')
+var limitValue = attributes.queryParams.limit default "100"
+var offsetValue = attributes.queryParams.offset default "0"
+---
+"SELECT Id, Document_Name__c, Document_Type__c, Related_Customer__c, Uploaded_By__c, Upload_Date__c FROM $(objectName) ORDER BY Upload_Date__c DESC LIMIT $(limitValue) OFFSET $(offsetValue)"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Query" message='#["Executing SOQL: $(vars.soqlQuery)"]' />
+		<salesforce:query config-ref="Salesforce_Config" doc:name="Query Customer Documents">
+			<salesforce:salesforce-query><![CDATA[#[vars.soqlQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform to API Response">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (item, index) -> {
+	Id: item.Id,
+	Document_Name__c: item.Document_Name__c,
+	Document_Type__c: item.Document_Type__c,
+	Related_Customer__c: item.Related_Customer__c,
+	Uploaded_By__c: item.Uploaded_By__c,
+	Upload_Date__c: item.Upload_Date__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Response" message='#["Successfully retrieved $(sizeOf(payload)) customer documents"]' />
+	</flow>
+	
+	<!-- POST /customer-documents -->
+	<flow name="post:\customer-documents:application\json:banking-system-api-config">
+		<logger level="INFO" doc:name="Log Request" message='#["POST /customer-documents - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Transform to Salesforce Format">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Document_Name__c: payload.Document_Name__c,
+	Document_Type__c: payload.Document_Type__c,
+	Related_Customer__c: payload.Related_Customer__c,
+	Uploaded_By__c: payload.Uploaded_By__c,
+	Upload_Date__c: payload.Upload_Date__c
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Payload" message="Creating customer document in Salesforce" />
+		<salesforce:create config-ref="Salesforce_Config" type="#[p('salesforce.objects.customerDocument')]" doc:name="Create Customer Document">
+			<salesforce:records><![CDATA[#[payload]]]></salesforce:records>
+		</salesforce:create>
+		<ee:transform doc:name="Extract Created Record">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="createdId"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].id]]></ee:set-variable>
+				<ee:set-variable variableName="isSuccess"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].success]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check Creation Success">
+			<when expression="#[vars.isSuccess == true]">
+				<salesforce:query config-ref="Salesforce_Config" doc:name="Query Created Record">
+					<salesforce:salesforce-query><![CDATA[#["SELECT Id, Document_Name__c, Document_Type__c, Related_Customer__c, Uploaded_By__c, Upload_Date__c FROM $(p('salesforce.objects.customerDocument')) WHERE Id = '$(vars.createdId)'"]]]></salesforce:salesforce-query>
+				</salesforce:query>
+				<ee:transform doc:name="Transform to API Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Id: payload[0].Id,
+	Document_Name__c: payload[0].Document_Name__c,
+	Document_Type__c: payload[0].Document_Type__c,
+	Related_Customer__c: payload[0].Related_Customer__c,
+	Uploaded_By__c: payload[0].Uploaded_By__c,
+	Upload_Date__c: payload[0].Upload_Date__c
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[201]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="Log Success" message='#["Successfully created customer document with Id: $(vars.createdId)"]' />
+			</when>
+			<otherwise>
+				<logger level="ERROR" doc:name="Log Failure" message="Failed to create customer document in Salesforce" />
+				<ee:transform doc:name="Error Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "CREATION_FAILED",
+	message: payload[0].errors[0].message default "Failed to create record",
+	timestamp: now(),
+	correlationId: vars.correlationId
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+
+</mule>

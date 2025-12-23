@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+		http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<!-- GET /account-opening-requests -->
+	<flow name="get:\account-opening-requests:banking-system-api-config" doc:id="312fef05-061d-4768-9d5d-2c70e1bb78aa">
+		<logger level="INFO" doc:name="Log Request" message='#["GET /account-opening-requests - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Build SOQL Query">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="soqlQuery"><![CDATA[%dw 2.0
+output application/java
+var objectName = p('salesforce.objects.accountOpeningRequest')
+var limitValue = attributes.queryParams.limit default "100"
+var offsetValue = attributes.queryParams.offset default "0"
+---
+"SELECT Id, Request_Number__c, Applicant__c, Account_Type__c, Status__c, Submission_Date__c FROM $(objectName) ORDER BY Submission_Date__c DESC LIMIT $(limitValue) OFFSET $(offsetValue)"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Query" message='#["Executing SOQL: $(vars.soqlQuery)"]' />
+		<salesforce:query config-ref="Salesforce_Config" doc:name="Query Account Opening Requests">
+			<salesforce:salesforce-query><![CDATA[#[vars.soqlQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform to API Response">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (item, index) -> {
+	Id: item.Id,
+	Request_Number__c: item.Request_Number__c,
+	Applicant__c: item.Applicant__c,
+	Account_Type__c: item.Account_Type__c,
+	Status__c: item.Status__c,
+	Submission_Date__c: item.Submission_Date__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Response" message='#["Successfully retrieved $(sizeOf(payload)) account opening requests"]' />
+	</flow>
+	
+	<!-- POST /account-opening-requests -->
+	<flow name="post:\account-opening-requests:application\json:banking-system-api-config" doc:id="3ab1995f-3fd5-47fa-abdf-9acfe4084543">
+		<logger level="INFO" doc:name="Log Request" message='#["POST /account-opening-requests - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Transform to Salesforce Format">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Request_Number__c: payload.Request_Number__c,
+	Applicant__c: payload.Applicant__c,
+	Account_Type__c: payload.Account_Type__c,
+	Status__c: payload.Status__c,
+	Submission_Date__c: payload.Submission_Date__c
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Payload" message="Creating account opening request in Salesforce" />
+		<salesforce:create config-ref="Salesforce_Config" type="#[p('salesforce.objects.accountOpeningRequest')]" doc:name="Create Account Opening Request">
+			<salesforce:records><![CDATA[#[payload]]]></salesforce:records>
+		</salesforce:create>
+		<ee:transform doc:name="Extract Created Record">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="createdId"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].id]]></ee:set-variable>
+				<ee:set-variable variableName="isSuccess"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].success]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check Creation Success">
+			<when expression="#[vars.isSuccess == true]">
+				<salesforce:query config-ref="Salesforce_Config" doc:name="Query Created Record">
+					<salesforce:salesforce-query><![CDATA[#["SELECT Id, Request_Number__c, Applicant__c, Account_Type__c, Status__c, Submission_Date__c FROM $(p('salesforce.objects.accountOpeningRequest')) WHERE Id = '$(vars.createdId)'"]]]></salesforce:salesforce-query>
+				</salesforce:query>
+				<ee:transform doc:name="Transform to API Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Id: payload[0].Id,
+	Request_Number__c: payload[0].Request_Number__c,
+	Applicant__c: payload[0].Applicant__c,
+	Account_Type__c: payload[0].Account_Type__c,
+	Status__c: payload[0].Status__c,
+	Submission_Date__c: payload[0].Submission_Date__c
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[201]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="Log Success" message='#["Successfully created account opening request with Id: $(vars.createdId)"]' />
+			</when>
+			<otherwise>
+				<logger level="ERROR" doc:name="Log Failure" message="Failed to create account opening request in Salesforce" />
+				<ee:transform doc:name="Error Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "CREATION_FAILED",
+	message: payload[0].errors[0].message default "Failed to create record",
+	timestamp: now(),
+	correlationId: vars.correlationId
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+
+</mule>

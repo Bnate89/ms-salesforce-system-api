@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xmlns:salesforce="http://www.mulesoft.org/schema/mule/salesforce"
+	xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+	xsi:schemaLocation="
+		http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+		http://www.mulesoft.org/schema/mule/salesforce http://www.mulesoft.org/schema/mule/salesforce/current/mule-salesforce.xsd
+		http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+	<!-- GET /transactions -->
+	<flow name="get:\transactions:banking-system-api-config">
+		<logger level="INFO" doc:name="Log Request" message='#["GET /transactions - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Build SOQL Query">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="soqlQuery"><![CDATA[%dw 2.0
+output application/java
+var objectName = p('salesforce.objects.transaction')
+var limitValue = attributes.queryParams.limit default "100"
+var offsetValue = attributes.queryParams.offset default "0"
+---
+"SELECT Id, Transaction_ID__c, Payer__c, Transaction_Type__c, Amount__c, Status__c, Transaction_Date__c FROM $(objectName) ORDER BY Transaction_Date__c DESC LIMIT $(limitValue) OFFSET $(offsetValue)"]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Query" message='#["Executing SOQL: $(vars.soqlQuery)"]' />
+		<salesforce:query config-ref="Salesforce_Config" doc:name="Query Transactions">
+			<salesforce:salesforce-query><![CDATA[#[vars.soqlQuery]]]></salesforce:salesforce-query>
+		</salesforce:query>
+		<ee:transform doc:name="Transform to API Response">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+payload map (item, index) -> {
+	Id: item.Id,
+	Transaction_ID__c: item.Transaction_ID__c,
+	Payer__c: item.Payer__c,
+	Transaction_Type__c: item.Transaction_Type__c,
+	Amount__c: item.Amount__c,
+	Status__c: item.Status__c,
+	Transaction_Date__c: item.Transaction_Date__c
+}]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="INFO" doc:name="Log Response" message='#["Successfully retrieved $(sizeOf(payload)) transactions"]' />
+	</flow>
+	
+	<!-- POST /transactions -->
+	<flow name="post:\transactions:application\json:banking-system-api-config">
+		<logger level="INFO" doc:name="Log Request" message='#["POST /transactions - CorrelationId: $(vars.correlationId)"]' />
+		<ee:transform doc:name="Transform to Salesforce Format">
+			<ee:message>
+				<ee:set-payload><![CDATA[%dw 2.0
+output application/java
+---
+[{
+	Transaction_ID__c: payload.Transaction_ID__c,
+	Payer__c: payload.Payer__c,
+	Transaction_Type__c: payload.Transaction_Type__c,
+	Amount__c: payload.Amount__c,
+	Status__c: payload.Status__c,
+	Transaction_Date__c: payload.Transaction_Date__c
+}]]]></ee:set-payload>
+			</ee:message>
+		</ee:transform>
+		<logger level="DEBUG" doc:name="Log Payload" message="Creating transaction in Salesforce" />
+		<salesforce:create config-ref="Salesforce_Config" type="#[p('salesforce.objects.transaction')]" doc:name="Create Transaction">
+			<salesforce:records><![CDATA[#[payload]]]></salesforce:records>
+		</salesforce:create>
+		<ee:transform doc:name="Extract Created Record">
+			<ee:message />
+			<ee:variables>
+				<ee:set-variable variableName="createdId"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].id]]></ee:set-variable>
+				<ee:set-variable variableName="isSuccess"><![CDATA[%dw 2.0
+output application/java
+---
+payload[0].success]]></ee:set-variable>
+			</ee:variables>
+		</ee:transform>
+		<choice doc:name="Check Creation Success">
+			<when expression="#[vars.isSuccess == true]">
+				<salesforce:query config-ref="Salesforce_Config" doc:name="Query Created Record">
+					<salesforce:salesforce-query><![CDATA[#["SELECT Id, Transaction_ID__c, Payer__c, Transaction_Type__c, Amount__c, Status__c, Transaction_Date__c FROM $(p('salesforce.objects.transaction')) WHERE Id = '$(vars.createdId)'"]]]></salesforce:salesforce-query>
+				</salesforce:query>
+				<ee:transform doc:name="Transform to API Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	Id: payload[0].Id,
+	Transaction_ID__c: payload[0].Transaction_ID__c,
+	Payer__c: payload[0].Payer__c,
+	Transaction_Type__c: payload[0].Transaction_Type__c,
+	Amount__c: payload[0].Amount__c,
+	Status__c: payload[0].Status__c,
+	Transaction_Date__c: payload[0].Transaction_Date__c
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[201]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+				<logger level="INFO" doc:name="Log Success" message='#["Successfully created transaction with Id: $(vars.createdId)"]' />
+			</when>
+			<otherwise>
+				<logger level="ERROR" doc:name="Log Failure" message="Failed to create transaction in Salesforce" />
+				<ee:transform doc:name="Error Response">
+					<ee:message>
+						<ee:set-payload><![CDATA[%dw 2.0
+output application/json
+---
+{
+	error: "CREATION_FAILED",
+	message: payload[0].errors[0].message default "Failed to create record",
+	timestamp: now(),
+	correlationId: vars.correlationId
+}]]></ee:set-payload>
+					</ee:message>
+					<ee:variables>
+						<ee:set-variable variableName="httpStatus"><![CDATA[400]]></ee:set-variable>
+					</ee:variables>
+				</ee:transform>
+			</otherwise>
+		</choice>
+	</flow>
+
+</mule>

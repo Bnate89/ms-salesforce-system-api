@@ -1,0 +1,53 @@
+{
+  "configs": [
+    "implementation/card-requests-impl.xml",
+    "implementation/investment-program-enrollments-impl.xml",
+    "implementation/transactions-impl.xml",
+    "global-error-handler.xml",
+    "implementation/branch-appointments-impl.xml",
+    "implementation/customer-households-impl.xml",
+    "implementation/customer-documents-impl.xml",
+    "implementation/loan-applications-impl.xml",
+    "global.xml",
+    "implementation/customer-interactions-impl.xml",
+    "implementation/account-opening-requests-impl.xml",
+    "mc-salesforce-system-api.xml",
+    "implementation/compliance-checks-impl.xml"
+  ],
+  "secureProperties": [],
+  "supportedJavaVersions": [],
+  "redeploymentEnabled": true,
+  "name": "78c3b5c8-9e25-47eb-ad18-be0e4d3cb6b9:ms-salesforce-system-api:1.0.0-SNAPSHOT",
+  "minMuleVersion": "4.9.3",
+  "requiredProduct": "MULE_EE",
+  "classLoaderModelLoaderDescriptor": {
+    "id": "mule",
+    "attributes": {
+      "exportedPackages": [],
+      "exportedResources": [
+        "config-dev.yaml",
+        "global-error-handler.xml",
+        "global.xml",
+        "implementation/account-opening-requests-impl.xml",
+        "implementation/branch-appointments-impl.xml",
+        "implementation/card-requests-impl.xml",
+        "implementation/compliance-checks-impl.xml",
+        "implementation/customer-documents-impl.xml",
+        "implementation/customer-households-impl.xml",
+        "implementation/customer-interactions-impl.xml",
+        "implementation/investment-program-enrollments-impl.xml",
+        "implementation/loan-applications-impl.xml",
+        "implementation/transactions-impl.xml",
+        "log4j2.xml",
+        "mc-salesforce-system-api.xml"
+      ]
+    }
+  },
+  "bundleDescriptorLoader": {
+    "id": "mule",
+    "attributes": {}
+  },
+  "javaSpecificationVersions": [
+    "17"
+  ]
+}
